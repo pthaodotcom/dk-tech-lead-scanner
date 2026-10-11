@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<title>DK-Tech Request Test</title>
+<style>
+body{font:14px/1.5 system-ui;background:#f5f7fa;color:#152238;width:450px;margin:18px}h1{font-size:19px}label{display:block;margin:12px 0 4px}input,textarea,button{box-sizing:border-box;width:100%;padding:10px;border:1px solid #b9c4d3;border-radius:6px}textarea{min-height:72px;resize:vertical}button{background:#164e63;color:white;margin-top:12px;cursor:pointer}button:disabled{opacity:.5}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.confirm{display:flex;gap:8px;align-items:flex-start}.confirm input{width:auto;margin-top:5px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;padding:12px;max-height:420px;overflow:auto}small{color:#475569}
+</style>
+<h1>DK-Tech Facebook Scanner <small>v0.2.0</small></h1>
+<p>Mở hai tab bằng Page DK-Tech: một tab <strong>Nhóm của bạn</strong> đã đổi sắp xếp và một tab group đã tải thêm bài.</p>
+<label for="actor">ID Page cần kiểm tra</label><input id="actor" inputmode="numeric" placeholder="ID số của Page">
+<small>Đối chiếu ID này với danh tính trong request; không tự chuyển Page.</small>
+<button id="inspect">1. Xem trạng thái tab và comment (chỉ đọc)</button>
+<button id="run">2. Thử đọc lại bằng request</button>
+<div class="grid">
+  <label>Số group tối đa<input id="maxGroups" type="number" min="1" max="200" value="91"></label>
+  <label>Số trang mỗi group<input id="maxPages" type="number" min="1" max="20" value="3"></label>
+</div>
+<button id="scan">3. Quét group và bài, chống trùng</button>
+<p><strong>Bài thử comment:</strong> group 1163787441488087, bài 1802484360951722.</p>
+<label for="comment">Nội dung comment thử</label>
+<textarea id="comment" maxlength="300" placeholder="Nhập nội dung mới, không trùng comment đã có"></textarea>
+<label class="confirm"><input id="confirm" type="checkbox"><span>Tôi xác nhận đây là comment công khai và chỉ gửi một lần.</span></label>
+<button id="prepare">4. Kiểm tra bài, Page và mutation</button>
+<button id="send" disabled>5. Gửi đúng một comment thử</button>
+<p>Không lưu cookie, token hoặc request body vào báo cáo. Nếu kết quả gửi mơ hồ, tiện ích khóa lần thử lại cùng nội dung.</p>
+<pre id="result">Chưa chạy.</pre>
+<script src="popup.js"></script>
+</html>

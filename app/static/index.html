@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DK-Tech Lead Scanner</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">CÔNG CỤ CÁ NHÂN · CHẠY CỤC BỘ</p>
+      <h1>DK-Tech Lead Scanner</h1>
+      <p class="sub">Rule lọc bài trước, Laya đánh giá nhu cầu và an toàn, Qwen viết comment; Chrome gửi bằng Page.</p>
+    </div>
+    <div class="header-actions">
+      <button id="refresh" class="secondary">Làm mới</button>
+      <button id="clearPending" class="secondary">Xóa bài đã quét</button>
+      <button id="stopTool" class="stop">Dừng tool</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="stats" aria-label="Tổng quan">
+      <article><span>Bài tiềm năng (24h)</span><strong id="candidateCount">0</strong></article>
+      <article><span>Chưa chắc chắn</span><strong id="uncertainCount">0</strong></article>
+      <article><span>Đã chặn</span><strong id="blockedCount">0</strong></article>
+      <article><span>Comment chờ gửi</span><strong id="queueCount">0</strong></article>
+      <article><span>Comment đã gửi</span><strong id="sentCount">0</strong></article>
+      <article><span>Nhóm quét / gửi</span><strong id="groupStatsDisplay">0 / 0</strong></article>
+    </section>
+
+    <section class="notice">
+      <div><strong>Page:</strong> DK-Tech · <code>61593769810301</code></div>
+      <div id="lastScan">Chưa có lần quét nào.</div>
+      <div id="layaStatus">Laya multilingual đang chờ bài cần phân loại.</div>
+      <div>Dashboard chỉ hiển thị bài có ngày đăng trong 24 giờ gần nhất (ưu tiên bài mới nhất).</div>
+      <div class="danger">Bài <code>1802484360951722</code> đã khóa vĩnh viễn, extension không được gửi comment.</div>
+    </section>
+
+    <section class="rules-panel">
+      <div>
+        <p class="eyebrow">RULE LỌC BÀI</p>
+        <h2>Tự cấu hình điều kiện</h2>
+        <p class="muted">Mỗi dòng hoặc dấu phẩy là một từ khóa. Lưu rule sẽ áp dụng lại cho toàn bộ bài đã quét.</p>
+      </div>
+      <div class="rule-fields">
+        <label>Từ khóa giữ lại<textarea id="includeKeywords" rows="5"></textarea></label>
+        <label>Từ khóa loại bỏ<textarea id="excludeKeywords" rows="5"></textarea></label>
+        <div class="rule-options">
+          <label>Số từ khóa tối thiểu <input id="minimumMatches" type="number" min="1" max="20" value="1"></label>
+          <label class="check"><input id="includeUnmatched" type="checkbox" checked> Vẫn gửi bài không khớp để tránh bỏ sót</label>
+          <button id="saveRules">Lưu và áp dụng rule</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="groups-panel" id="groupsSection">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">CẤU HÌNH NHÓM</p>
+          <h2>Chọn nhóm quét bài & gửi comment</h2>
+          <p class="muted">Chỉ quét bài mới (trong 24h) và gửi comment tự động vào các nhóm Facebook được bật bên dưới.</p>
+        </div>
+        <div class="group-stats-badges">
+          <span class="pill candidate">Bật quét: <strong id="scanEnabledCount">0</strong>/<span id="totalGroupsCount1">0</span> nhóm</span>
+          <span class="pill candidate">Bật gửi: <strong id="commentEnabledCount">0</strong>/<span id="totalGroupsCount2">0</span> nhóm</span>
+        </div>
+      </div>
+
+      <div class="group-toolbar">
+        <input id="groupSearchInput" type="search" placeholder="🔍 Tìm theo tên nhóm hoặc Group ID..." autocomplete="off">
+        <div class="group-btn-row">
+          <button id="btnPresetTech" class="secondary" type="button" title="Tự động chọn các nhóm liên quan đến Công nghệ, IT, Web, App, Tool, Phần mềm">🎯 Chọn nhóm Công nghệ / Web / App / Tool</button>
+          <button id="btnEnableAllScan" class="secondary" type="button">Bật quét tất cả</button>
+          <button id="btnDisableAllScan" class="secondary" type="button">Tắt quét tất cả</button>
+          <button id="btnEnableAllComment" class="secondary" type="button">Bật gửi tất cả</button>
+          <button id="btnDisableAllComment" class="secondary" type="button">Tắt gửi tất cả</button>
+          <button id="btnSaveGroupConfig" type="button">💾 Lưu cấu hình nhóm</button>
+        </div>
+      </div>
+
+      <div class="group-table-wrap">
+        <table class="group-table">
+          <thead>
+            <tr>
+              <th style="width:40px;text-align:center">#</th>
+              <th>Tên nhóm</th>
+              <th style="width:130px;text-align:center">Quét bài (24h)</th>
+              <th style="width:130px;text-align:center">Gửi comment</th>
+              <th style="width:100px;text-align:center">Bài đã lưu</th>
+              <th style="width:80px;text-align:center">Facebook</th>
+            </tr>
+          </thead>
+          <tbody id="groupTableBody">
+            <tr><td colspan="6" class="muted" style="text-align:center;padding:24px">Đang tải danh sách nhóm...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="history-panel">
+      <div class="section-head">
+        <div><p class="eyebrow">NHẬT KÝ TỰ ĐỘNG</p><h2>Comment đã xử lý</h2></div>
+        <p>Hiển thị nội dung đã gửi, bài đích, thời gian và comment ID Facebook.</p>
+      </div>
+      <div id="sentComments" class="sent-list"><p class="muted">Chưa có comment nào.</p></div>
+    </section>
+
+    <nav class="filters" aria-label="Lọc bài">
+      <button data-bucket="all" class="active">Tất cả</button>
+      <button data-bucket="candidate">Tiềm năng</button>
+      <button data-bucket="uncertain">Chưa chắc</button>
+      <button data-bucket="blocked">Đã chặn</button>
+    </nav>
+
+    <section id="posts" class="post-list" aria-live="polite"></section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

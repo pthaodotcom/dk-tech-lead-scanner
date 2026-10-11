@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "DK-Tech Lead Scanner",
+  "version": "0.6.7",
+  "description": "Lọc bài theo rule, Laya phân loại lead, Qwen local viết comment và tự gửi bằng Page DK-Tech.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "alarms",
+    "background",
+    "debugger"
+  ],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "http://127.0.0.1:9350/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "DK-Tech Lead Scanner"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.facebook.com/*"
+      ],
+      "js": [
+        "core.js",
+        "ui-driver.js",
+        "probe.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "minimum_chrome_version": "120"
+}

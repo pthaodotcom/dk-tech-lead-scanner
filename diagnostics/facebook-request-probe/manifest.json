@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "DK-Tech — kiểm tra request Facebook",
+  "version": "0.2.0",
+  "description": "Quét group và bài viết qua request Facebook, chống trùng và kiểm tra comment bằng Page DK-Tech.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["http://127.0.0.1:9340/*"],
+  "action": { "default_popup": "popup.html", "default_title": "DK-Tech Request Test" },
+  "content_scripts": [{
+    "matches": ["https://www.facebook.com/*"],
+    "js": ["core.js", "probe.js"],
+    "run_at": "document_start",
+    "world": "MAIN"
+  }]
+}

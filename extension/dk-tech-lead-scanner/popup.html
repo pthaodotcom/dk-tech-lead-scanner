@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi">
+<meta charset="utf-8">
+<title>DK-Tech Lead Scanner</title>
+<style>
+body{font:14px/1.5 system-ui;width:440px;margin:0;background:#f3f6f8;color:#173043}header{background:#103748;color:white;padding:17px 20px}h1{font-size:19px;margin:0}.version{color:#6ed7c2;font-size:12px}main{padding:16px 20px}section{background:white;border:1px solid #dce5ea;border-radius:10px;padding:14px;margin-bottom:12px}h2{font-size:15px;margin:0 0 8px}label{display:block;margin:9px 0 4px}input,textarea,button{box-sizing:border-box;width:100%;font:inherit;border:1px solid #bccbd4;border-radius:7px;padding:9px}textarea{min-height:85px;resize:vertical}button{background:#087f6f;color:white;border:0;font-weight:700;margin-top:9px;cursor:pointer}button.secondary{background:#eef3f5;color:#234151;border:1px solid #ccd8de}button:disabled{opacity:.45;cursor:not-allowed}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.confirm{display:flex;gap:8px;align-items:flex-start}.confirm input{width:auto;margin-top:5px}.muted{font-size:12px;color:#647686}.danger{font-size:12px;color:#9b342e}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#102f3f;color:#d9eef0;padding:11px;border-radius:8px;max-height:230px;overflow:auto;margin:10px 0 0}.hidden{display:none}a{color:#15647e}
+</style>
+<header><h1>DK-Tech Lead Scanner <span class="version">v0.6.7</span></h1></header>
+<main>
+  <section>
+    <h2>Chạy khi đóng cửa sổ Chrome</h2>
+    <p class="muted">Bật “Tiếp tục chạy các ứng dụng nền khi Google Chrome đóng”. Tool dùng cửa sổ tác vụ thu nhỏ và tự tạo lại khi cần. Máy phải còn bật, không Sleep; không chọn Thoát Chrome hay kết thúc tiến trình. Dịch vụ cục bộ phải còn chạy.</p>
+    <button id="backgroundSettings" class="secondary">Mở cài đặt chạy nền Chrome</button>
+  </section>
+  <section>
+    <h2>1. Quét và đồng bộ (Bài trong 24h)</h2>
+    <p class="muted">Chỉ quét bài mới nhất trong 24h qua các group đã bật trong cấu hình dashboard. Quét ngầm tự chạy theo nhóm đã cấu hình.</p>
+    <p id="groupConfigSummary" class="muted" style="margin:4px 0 8px">Cấu hình: <strong id="popupGroupCount">--</strong> nhóm đang bật quét bài 24h. <a id="openGroupConfig" href="#" style="color:#087f6f;font-weight:700">⚙️ Cấu hình nhóm</a></p>
+    <div class="grid">
+      <label>Số group<input id="maxGroups" type="number" min="1" max="200" value="91"></label>
+      <label>Trang/group (cả quét ngầm)<input id="maxPages" type="number" min="1" max="20" value="3"></label>
+    </div>
+    <button id="scan">Quét group và bài</button>
+    <button id="dashboard" class="secondary">Mở dashboard</button>
+    <div class="grid">
+      <label>Phút nghỉ giữa vòng quét<input id="scanInterval" type="number" min="10" max="180" value="10"></label>
+    </div>
+    <button id="scanStart">Bật quét ngầm</button>
+    <button id="scanStop" class="secondary">Dừng quét ngầm</button>
+    <p id="scanStatus" class="muted">Đang đọc trạng thái quét ngầm…</p>
+  </section>
+  <section>
+    <h2>2. Comment tự động</h2>
+    <p class="muted">Rule lọc bài trước; Laya phân loại nhu cầu/an toàn; chỉ bài phù hợp mới sang Qwen viết nội dung và extension tự gửi.</p>
+    <div class="grid">
+      <label>Số comment/lượt<input id="autoLimit" type="number" min="1" max="10" value="3"></label>
+      <label>Phút nghỉ giữa comment<input id="autoDelay" type="number" min="2" max="60" value="10"></label>
+      <label>Giới hạn comment/giờ<input id="autoHourlyLimit" type="number" min="1" max="20" value="4"></label>
+      <label>Giới hạn comment/ngày<input id="autoDailyLimit" type="number" min="1" max="200" value="20"></label>
+    </div>
+    <button id="autoSaveLimits" class="secondary">Lưu giới hạn gửi</button>
+    <button id="autoTest" class="secondary">Thử gửi 1 comment rồi dừng</button>
+    <button id="autoStart">Bật gửi ngầm</button>
+    <button id="autoStop" class="secondary">Dừng gửi ngầm</button>
+    <button id="autoClearPending" class="secondary">Xóa bài đã quét</button>
+    <p id="autoStatus" class="muted">Đang đọc trạng thái…</p>
+    <p class="danger">Bài 1802484360951722 bị khóa vĩnh viễn và không thể gửi.</p>
+  </section>
+  <pre id="result">Tool cục bộ chưa được kiểm tra.</pre>
+</main>
+<script src="popup.js"></script>
+</html>
