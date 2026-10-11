@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 import threading
 from pathlib import Path
+from laya_adapter import configured_model_version
 
 os.environ.setdefault("USE_TF", "0")
 
 MODEL = "convaiinnovations/laya/multilingual"
-CLASSIFIER_VERSION = "2026-10-11-post-type-v2"
+CLASSIFIER_VERSION = "2026-10-11-trained-post-type-v3-" + configured_model_version()
 MIN_CONFIDENCE = 0.60
+UNCERTAIN_POST_TYPE_SEND_THRESHOLD = 0.70
 
 QUESTIONS = {
     "intent": {
@@ -85,12 +87,14 @@ QUESTIONS = {
 }
 
 _agent = None
+_post_type_adapter = None
 _load_error: str | None = None
 _lock = threading.Lock()
+_predict_lock = threading.Lock()
 
 
 def _get_agent():
-    global _agent, _load_error
+    global _agent, _post_type_adapter, _load_error
     if _agent is not None:
         return _agent
     with _lock:
@@ -113,7 +117,11 @@ def _get_agent():
                         model_source = str(cached)
                 except FileNotFoundError:
                     pass
-                _agent = laya.load(model_source, subfolder="multilingual", device="cpu")
+                agent = laya.load(model_source, subfolder="multilingual", device="cpu")
+                from laya_adapter import load_adapter
+                adapter = load_adapter(agent)
+                _post_type_adapter = adapter
+                _agent = agent
                 _load_error = None
             except Exception as exc:
                 _load_error = f"{type(exc).__name__}: {exc}"
@@ -137,17 +145,60 @@ def status() -> dict:
         "loaded": _agent is not None,
         "model": MODEL,
         "version": version,
+        "classifierVersion": CLASSIFIER_VERSION,
+        "postTypeTraining": {
+            "loaded": _post_type_adapter is not None,
+            "version": _post_type_adapter.manifest["runVersion"] if _post_type_adapter else None,
+            "method": "classifier_head_with_frozen_laya_encoder_and_tfidf" if _post_type_adapter else None,
+        },
         "error": _load_error or error,
         "minimumConfidence": MIN_CONFIDENCE,
     }
+
+
+def allows_uncertain_post_type(result: dict) -> bool:
+    """Owner policy: a type prediction below 70% must not veto a supported, safe post."""
+    confidences = result.get("confidences") or {}
+    type_confidence = confidences.get("post_type")
+    if type_confidence is None or result.get("postType") not in {
+        "service_request", "recruitment", "self_promotion", "other"
+    }:
+        return False
+    try:
+        return (
+            0 <= float(type_confidence) < UNCERTAIN_POST_TYPE_SEND_THRESHOLD
+            and result.get("bucket") != "blocked"
+            and result.get("service") in {"website", "software", "automation"}
+            and result.get("safety") == "safe"
+            and float(confidences.get("service", 0)) >= MIN_CONFIDENCE
+            and float(confidences.get("safety", 0)) >= MIN_CONFIDENCE
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 def classify(post_text: str) -> dict:
     text = (post_text or "").strip()
     if not text:
         raise ValueError("Bài không có nội dung để phân loại bằng Laya")
-    result = _get_agent().predict(text[:12000], QUESTIONS, max_len=1024, head_max_len=256)
-    answers = result.get("answers") or {}
+    agent = _get_agent()
+    with _predict_lock:
+        if _post_type_adapter is not None:
+            result = agent.predict(text[:12000], {key: QUESTIONS[key] for key in ("service", "safety")},
+                                   max_len=1024, head_max_len=256)
+            answers = result.get("answers") or {}
+            typed = _post_type_adapter.predict(agent, text[:12000])
+            answers["post_type"] = typed
+            request_probability = float((typed.get("probabilities") or {}).get("service_request", 0))
+            is_request = typed.get("choice") == "service_request"
+            answers["intent"] = {
+                "choice": "seeking_provider" if is_request else "not_seeking_provider",
+                "answer_confidence": request_probability if is_request else 1 - request_probability,
+                "probabilities": {"seeking_provider": request_probability, "not_seeking_provider": 1-request_probability},
+            }
+        else:
+            result = agent.predict(text[:12000], QUESTIONS, max_len=1024, head_max_len=256)
+            answers = result.get("answers") or {}
     intent = answers.get("intent") or {}
     post_type = answers.get("post_type") or {}
     service = answers.get("service") or {}
@@ -173,7 +224,16 @@ def classify(post_text: str) -> dict:
     supported = service_label in {"website", "software", "automation"}
     unsafe = safety_label == "B" and confidences["safety"] >= MIN_CONFIDENCE
     confident = all(value >= MIN_CONFIDENCE for value in confidences.values())
-    qualified = intent_label == "seeking_provider" and supported and safety_label == "A" and confident
+    post_type_minimum = (_post_type_adapter.manifest.get("minimumPostTypeConfidence", MIN_CONFIDENCE)
+                         if _post_type_adapter else MIN_CONFIDENCE)
+    qualified = (intent_label == "seeking_provider" and post_type_label == "service_request"
+                 and confidences["post_type"] >= post_type_minimum
+                 and supported and safety_label == "A" and confident)
+    qualified = qualified or allows_uncertain_post_type({
+        "postType": post_type_label, "service": service_label,
+        "safety": "safe" if safety_label == "A" else "unsafe",
+        "confidences": confidences,
+    })
     bucket = "blocked" if unsafe else "qualified" if qualified else "uncertain"
     labels = {
         "intent": intent_label or "unknown",
@@ -188,6 +248,8 @@ def classify(post_text: str) -> dict:
         "confidence": min(confidences.values()),
         "service": labels["service"],
         "postType": labels["post_type"],
+        "postTypeModel": "trained_head_on_laya_encoder" if _post_type_adapter else "zero_shot",
+        "postTypeMinimumConfidence": post_type_minimum,
         "safety": labels["safety"],
         "labels": labels,
         "confidences": confidences,

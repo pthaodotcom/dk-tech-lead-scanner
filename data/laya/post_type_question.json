@@ -1,0 +1,12 @@
+{
+  "post_type": {
+    "type": "choice",
+    "instructions": "Phân loại mục đích chính của tác giả bài viết. Thuê bên ngoài làm một sản phẩm/dự án khác với tuyển nhân viên. Đọc cả bài; câu hỏi quảng cáo hướng tới người đọc không phải nhu cầu của người đăng.",
+    "criteria": {
+      "service_request": "Khách hàng cần thuê/mua dịch vụ hoặc sản phẩm, tìm người/đơn vị làm dự án cho mình, hỏi báo giá. Thuê freelancer theo sản phẩm cũng thuộc loại này.",
+      "recruitment": "Tuyển nhân viên, intern, cộng tác viên vào đội ngũ. Có vị trí làm việc, lương, CV, ứng tuyển hoặc yêu cầu nhân sự.",
+      "self_promotion": "Người đăng chào bán/nhận cung cấp dịch vụ, sản phẩm, tự giới thiệu năng lực; mời khách inbox, đặt mua hoặc nhận tư vấn của mình.",
+      "other": "Chia sẻ kiến thức, thảo luận, chào thành viên, khảo sát, hỏi lời khuyên hoặc mời thử sản phẩm; không thuộc ba loại trên."
+    }
+  }
+}

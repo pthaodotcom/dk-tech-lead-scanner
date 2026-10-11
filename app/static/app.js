@@ -15,7 +15,11 @@ function layaTypeLabel(type) {
 function layaStatusText(post) {
   if (post.laya_status !== 'done') return ({pending:'Đang chờ Laya',processing:'Laya đang phân loại',failed:'Laya lỗi'})[post.laya_status] || 'Chưa phân loại';
   const type = layaTypeLabel(post.laya_post_type);
+  if (post.laya_bucket === 'blocked') return type ? `Chặn an toàn · ${type}` : 'Bị chặn do nội dung không an toàn';
+  if (post.laya_low_confidence_send_allowed) return `Nghiêng về: ${type || 'Chưa rõ loại bài'} · vẫn xét gửi (dưới 70%)`;
   if (type) {
+    const minimum = post.laya_post_type === 'service_request' ? Number(post.laya_post_type_minimum_confidence ?? .6) : .6;
+    if (post.laya_post_type_confidence != null && Number(post.laya_post_type_confidence) < minimum) return `Nghiêng về: ${type} · cần xem lại`;
     if (post.laya_bucket === 'qualified') return `Đủ điều kiện · ${type}`;
     if (post.laya_post_type === 'recruitment' || post.laya_post_type === 'self_promotion' || post.laya_post_type === 'other') return `${type} · không phải lead`;
     return `${type} · chưa đủ chắc để tự động comment`;
@@ -165,7 +169,7 @@ function render(data) {
     const failed = stats.failed || 0;
     const classifier = data.layaClassifier || {};
     const modelState = classifier.error ? 'lỗi khi tải model' : classifier.loaded ? 'đã tải model' : classifier.available ? 'model sẽ tải khi có bài' : 'chưa sẵn sàng';
-    layaStatus.textContent = `Laya multilingual · ${modelState} · ${pending} bài đang chờ/đang xét · ${failed} lỗi`;
+    layaStatus.textContent = `Laya multilingual${classifier.postTypeTraining?.loaded ? ' · đã train loại bài' : ''} · ${modelState} · ${pending} bài đang chờ/đang xét · ${failed} lỗi`;
     if (classifier.error) layaStatus.title = classifier.error;
   }
   if (!data.posts.length) {
@@ -181,7 +185,7 @@ function render(data) {
           <span class="pill ${post.bucket}">${post.bucket === 'candidate' ? 'Tiềm năng' : post.bucket === 'blocked' ? 'Đã chặn' : 'Chưa chắc'}</span>
           <span class="pill">Điểm ${post.score}</span>
           <span class="pill ${post.laya_bucket === 'qualified' ? 'candidate' : post.laya_bucket === 'blocked' ? 'blocked' : 'uncertain'}">Laya: ${escapeHtml(layaStatusText(post))}</span>
-          ${post.laya_confidence != null ? `<span class="pill">Tin cậy ${(Number(post.laya_confidence) * 100).toFixed(0)}%</span>` : ''}
+          ${post.laya_status === 'done' && post.laya_post_type_confidence != null ? `<span class="pill">Tin cậy loại bài ${(Number(post.laya_post_type_confidence) * 100).toFixed(0)}%</span>` : ''}
           <span class="pill">ID ${post.id}</span>
           ${post.published_at ? `<span class="pill">Đăng lúc: ${new Date(post.published_at).toLocaleString('vi-VN')}</span>` : ''}
           ${post.queue_status ? `<span class="pill">Comment: ${escapeHtml(post.queue_status)}</span>` : ''}

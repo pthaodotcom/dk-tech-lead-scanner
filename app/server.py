@@ -491,6 +491,15 @@ def dashboard_data(bucket: str = "all") -> dict:
             except (TypeError, json.JSONDecodeError):
                 laya_result = {}
             item["laya_post_type"] = (laya_result.get("postType") or "unknown")
+            item["laya_post_type_confidence"] = (laya_result.get("confidences") or {}).get("post_type")
+            item["laya_post_type_minimum_confidence"] = laya_result.get("postTypeMinimumConfidence", .6)
+            item["laya_low_confidence_send_allowed"] = (
+                item.get("laya_status") == "done"
+                and item.get("laya_bucket") != "blocked"
+                and laya_classifier.allows_uncertain_post_type(laya_result)
+            )
+            if item["laya_low_confidence_send_allowed"]:
+                item["laya_bucket"] = "qualified"
             posts.append(item)
         counts = {row["bucket"]: row["n"] for row in db.execute(
             """SELECT bucket,COUNT(*) n FROM posts
@@ -569,7 +578,13 @@ def auto_eligibility(post: sqlite3.Row | dict, config: dict | None = None) -> tu
     if item.get("laya_status") != "done":
         return False, "laya_" + str(item.get("laya_status") or "pending")
     if item.get("laya_bucket") != "qualified":
-        return False, "laya_not_qualified"
+        try:
+            laya_result = json.loads(item.get("laya_result") or "{}")
+        except (TypeError, json.JSONDecodeError):
+            laya_result = {}
+        if (item.get("laya_bucket") == "blocked"
+                or not laya_classifier.allows_uncertain_post_type(laya_result)):
+            return False, "laya_not_qualified"
     if not (item.get("text") or "").strip():
         return False, "empty_post"
     published_at = item.get("published_at")

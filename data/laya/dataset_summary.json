@@ -1,0 +1,22 @@
+{
+  "posts": 175,
+  "user_content_samples": 102,
+  "merged_user_families": 101,
+  "labels": {
+    "self_promotion": 135,
+    "service_request": 27,
+    "other": 12,
+    "recruitment": 1
+  },
+  "training_samples": {
+    "train:user_paste": 66,
+    "validation:user_paste": 14,
+    "test:user_paste": 19,
+    "review_only:user_paste": 3,
+    "train:synthetic_assistant": 60,
+    "validation:synthetic_assistant": 16,
+    "test:synthetic_assistant": 6
+  },
+  "synthetic_samples": 82,
+  "label_source": "Assistant-reviewed source text, not user-certified labels"
+}

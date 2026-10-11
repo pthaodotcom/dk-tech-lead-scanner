@@ -46,7 +46,8 @@ Script sẽ:
 4. Tải/nạp Laya multilingual nếu chưa có cache hoàn chỉnh; nếu có thì dùng cache.
 5. Tạo shortcut **DK Tech Lead Scanner** trên Desktop.
 
-Máy mới tải model riêng một lần. Model và cache ở máy cũ không nằm trong repo.
+Máy mới tải model nền Laya và Qwen một lần. Cache model nền ở máy cũ không nằm
+trong repo; đầu phân loại Laya đã train được đóng gói sẵn trong repo.
 Bước cài đặt không quét Facebook hoặc gửi comment.
 
 Có thể chạy từ PowerShell:
@@ -97,12 +98,39 @@ Mỗi group còn có giới hạn 3 comment/24 giờ ở backend.
 
 Một bài chỉ được tự gửi khi thuộc group cho phép gửi, đọc được ngày đăng trên
 Facebook và không quá 24 giờ, qua rule, được Laya đánh dấu phù hợp với độ tin cậy
-ít nhất 60% cho các câu hỏi phân loại, và chưa có lịch sử xếp hàng/gửi.
+ít nhất 60% cho nhóm dịch vụ/an toàn, và chưa có lịch sử xếp hàng/gửi.
+Khi dùng đầu phân loại đã train cục bộ, loại bài phải là nhu cầu tìm nhà cung cấp
+và qua ngưỡng riêng trong manifest model (bản ngày 11/10/2026 dùng 90%).
+Theo cấu hình chủ tool ngày 12/10/2026, nếu tin cậy loại bài dưới 70% thì vẫn
+được xét gửi, kể cả nhãn nghiêng về bài khác, tuyển dụng hoặc tự quảng cáo.
+Ngoại lệ này chỉ bỏ chặn theo loại bài/ý định; dịch vụ và an toàn vẫn phải đạt
+60%, đồng thời qua rule, tuổi bài, nhóm được phép gửi, chống trùng và giới hạn gửi.
 Độ tin cậy của model không phải tỷ lệ chính xác đã được kiểm chứng trên dữ liệu này.
 Nếu đã nhấn gửi mà kết quả chưa xác minh được, tool lưu lần thử và không gửi lại
 cùng nội dung. Không dùng lại bài bị khóa để ép chạy thử.
 
+## Dữ liệu phân loại Laya đã train
+
+175 bài từ file dashboard ngày 11/10/2026 đã được gán nhãn trong
+`data/laya/posts_labeled.jsonl`; bản đọc nhanh ở `data/laya/LABELS.md`.
+`data/laya/TRAINING_REPORT.md` ghi phương pháp, kết quả và giới hạn trên mẫu nhỏ.
+Đầu phân loại bốn nhãn học từ encoder Laya đóng băng và TF-IDF của tập học;
+trọng số đã train được đóng gói trong `models/laya-post-type/`, nhóm dịch vụ/an
+toàn dùng model gốc.
+
+Máy mới tự dùng `models/laya-post-type/active.json` và release đi kèm khi
+clone, `git pull` hoặc tải ZIP: **không cần train lại**. Chạy `setup-tool.cmd`
+để cài thư viện và tải model nền Laya/Qwen, rồi mở `start-tool.cmd`.
+Nếu có `.local/laya-training/active.json`, tool ưu tiên model đã được kích hoạt
+riêng trên máy đó. Muốn mang model riêng sang máy khác, chép file active và
+thư mục release được trỏ tới, giữ nguyên cấu trúc trong `.local/laya-training/`.
+Sau khi backend nạp model, dashboard hiện **đã train loại bài**.
+
 ## Chuyển từ máy cá nhân sang máy công ty
+
+Nếu đã clone repo, chạy `git pull`, rồi `setup-tool.cmd` và `start-tool.cmd`.
+Model phân loại đã train và rule gửi dưới 70% đi cùng mã nguồn. Rule từ khóa,
+nhóm đã chọn và lịch sử gửi được lưu trong database riêng của từng máy.
 
 Dừng quét và gửi trên máy cũ trước khi bật trên máy mới nếu chỉ muốn một máy gửi.
 Mỗi máy dùng database riêng nên lịch sử chống trùng không tự đồng bộ qua GitHub.
