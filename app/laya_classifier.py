@@ -10,9 +10,8 @@ from laya_adapter import configured_model_version
 os.environ.setdefault("USE_TF", "0")
 
 MODEL = "convaiinnovations/laya/multilingual"
-CLASSIFIER_VERSION = "2026-10-11-trained-post-type-v3-" + configured_model_version()
+CLASSIFIER_VERSION = "2026-10-12-service-request-confidence-advisory-v6-" + configured_model_version()
 MIN_CONFIDENCE = 0.60
-UNCERTAIN_POST_TYPE_SEND_THRESHOLD = 0.70
 
 QUESTIONS = {
     "intent": {
@@ -156,27 +155,6 @@ def status() -> dict:
     }
 
 
-def allows_uncertain_post_type(result: dict) -> bool:
-    """Owner policy: a type prediction below 70% must not veto a supported, safe post."""
-    confidences = result.get("confidences") or {}
-    type_confidence = confidences.get("post_type")
-    if type_confidence is None or result.get("postType") not in {
-        "service_request", "recruitment", "self_promotion", "other"
-    }:
-        return False
-    try:
-        return (
-            0 <= float(type_confidence) < UNCERTAIN_POST_TYPE_SEND_THRESHOLD
-            and result.get("bucket") != "blocked"
-            and result.get("service") in {"website", "software", "automation"}
-            and result.get("safety") == "safe"
-            and float(confidences.get("service", 0)) >= MIN_CONFIDENCE
-            and float(confidences.get("safety", 0)) >= MIN_CONFIDENCE
-        )
-    except (TypeError, ValueError):
-        return False
-
-
 def classify(post_text: str) -> dict:
     text = (post_text or "").strip()
     if not text:
@@ -184,10 +162,13 @@ def classify(post_text: str) -> dict:
     agent = _get_agent()
     with _predict_lock:
         if _post_type_adapter is not None:
-            result = agent.predict(text[:12000], {key: QUESTIONS[key] for key in ("service", "safety")},
-                                   max_len=1024, head_max_len=256)
-            answers = result.get("answers") or {}
-            typed = _post_type_adapter.predict(agent, text[:12000])
+            trained = (_post_type_adapter.predict_all(agent,text[:12000])
+                       if hasattr(_post_type_adapter,'predict_all') else
+                       {'post_type':_post_type_adapter.predict(agent,text[:12000])})
+            missing={key:QUESTIONS[key] for key in ('service','safety') if key not in trained}
+            result=agent.predict(text[:12000],missing,max_len=1024,head_max_len=256) if missing else {'answers':{}}
+            answers = {**(result.get('answers') or {}),**trained}
+            typed = answers['post_type']
             answers["post_type"] = typed
             request_probability = float((typed.get("probabilities") or {}).get("service_request", 0))
             is_request = typed.get("choice") == "service_request"
@@ -223,24 +204,37 @@ def classify(post_text: str) -> dict:
 
     supported = service_label in {"website", "software", "automation"}
     unsafe = safety_label == "B" and confidences["safety"] >= MIN_CONFIDENCE
-    confident = all(value >= MIN_CONFIDENCE for value in confidences.values())
+    minimums={key:float(answer.get('minimumConfidence',MIN_CONFIDENCE)) for key,answer in
+              (('intent',intent),('post_type',post_type),('service',service),('safety',safety))}
+    # Website/software/automation are all offered. A split between these three
+    # need not veto a buyer whose combined probability of supported work is high.
+    service_gate_confidence=float(service.get('supportedConfidence',confidences['service']))
+    service_gate_minimum=float(service.get('minimumSupportedConfidence',minimums['service']))
     post_type_minimum = (_post_type_adapter.manifest.get("minimumPostTypeConfidence", MIN_CONFIDENCE)
                          if _post_type_adapter else MIN_CONFIDENCE)
     qualified = (intent_label == "seeking_provider" and post_type_label == "service_request"
-                 and confidences["post_type"] >= post_type_minimum
-                 and supported and safety_label == "A" and confident)
-    qualified = qualified or allows_uncertain_post_type({
-        "postType": post_type_label, "service": service_label,
-        "safety": "safe" if safety_label == "A" else "unsafe",
-        "confidences": confidences,
-    })
+                 and supported and safety_label in {"A", "REVIEW"})
     bucket = "blocked" if unsafe else "qualified" if qualified else "uncertain"
     labels = {
         "intent": intent_label or "unknown",
         "post_type": post_type_label or "unknown",
         "service": service_label or "unknown",
-        "safety": "unsafe" if unsafe else "safe" if safety_label == "A" else "unknown",
+        "safety": "unsafe" if unsafe else "safe" if safety_label == "A" else "review" if safety_label == "REVIEW" else "unknown",
     }
+    decision_reasons=[]
+    if post_type_label!='service_request':
+        decision_reasons.append({'other':'Bài chia sẻ/hướng dẫn hoặc bài khác, không phải khách thuê dịch vụ',
+            'self_promotion':'Tác giả chào bán dịch vụ của mình','recruitment':'Bài tuyển nhân sự'}
+            .get(post_type_label,'Chưa xác định được nhu cầu thuê dịch vụ'))
+    elif not qualified and confidences['post_type']<post_type_minimum:
+        decision_reasons.append(f"Tin cậy nhu cầu {confidences['post_type']:.0%}, ngưỡng {post_type_minimum:.0%}")
+    if not supported:decision_reasons.append('Dịch vụ ngoài website, phần mềm và tự động hóa')
+    elif not qualified and service_gate_confidence<service_gate_minimum:
+        decision_reasons.append(f"Tin cậy thuộc dịch vụ nhận làm {service_gate_confidence:.0%}, ngưỡng {service_gate_minimum:.0%}")
+    if safety_label=='REVIEW':decision_reasons.append('Cần xem lại mục đích/quyền sử dụng; nhãn này được phép xét gửi')
+    elif safety_label!='A':decision_reasons.append('Chưa đạt điều kiện an toàn')
+    elif not qualified and confidences['safety']<minimums['safety']:
+        decision_reasons.append(f"Tin cậy an toàn {confidences['safety']:.0%}, ngưỡng {minimums['safety']:.0%}")
     return {
         "status": "done",
         "bucket": bucket,
@@ -261,4 +255,10 @@ def classify(post_text: str) -> dict:
         "model": MODEL,
         "classifierVersion": CLASSIFIER_VERSION,
         "minimumConfidence": MIN_CONFIDENCE,
+        'minimumConfidences':minimums,'decisionReasons':decision_reasons,
+        'strictServiceRequestOnly':True,
+        'supportedServiceConfidence':service_gate_confidence,
+        'minimumSupportedServiceConfidence':service_gate_minimum,
+        'safetyNeedsReview':safety_label=='REVIEW',
+        'confidencePolicy':'advisory_only',
     }

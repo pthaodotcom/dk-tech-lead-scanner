@@ -12,7 +12,7 @@ __pycache__/
 *.bak
 *.log
 *.safetensors
-!models/laya-post-type/releases/*/scorer.safetensors
+!models/laya-post-type/releases/*/*.safetensors
 .env
 .env.*
 !.env.example

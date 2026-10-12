@@ -56,15 +56,57 @@ class LayaEligibilityTests(unittest.TestCase):
         self.assertNotEqual(result["bucket"],"qualified")
         self.assertEqual(agent.called_questions,{"service","safety"})
 
-    def test_low_service_confidence_keeps_request_out_of_queue(self):
+    def test_low_service_confidence_does_not_veto_supported_request(self):
         result,_=self.run_classification(base_answers(service_confidence=.4),FakeAdapter("service_request"))
-        self.assertEqual(result["bucket"],"uncertain")
+        self.assertEqual(result["bucket"],"qualified")
 
-    def test_calibrated_type_threshold_is_respected(self):
+    def test_below_70_does_not_allow_non_buyer_labels(self):
+        for label in ('recruitment','self_promotion','other'):
+            with self.subTest(label=label):
+                result,_=self.run_classification(base_answers(),FakeAdapter(label,.65))
+                self.assertNotEqual(result['bucket'],'qualified')
+
+    def test_request_above_70_can_qualify(self):
+        result,_=self.run_classification(base_answers(),FakeAdapter('service_request',.96))
+        self.assertEqual(result['bucket'],'qualified')
+
+    def test_supported_request_needing_review_can_qualify(self):
+        answers=base_answers()
+        answers['safety']={'choice':'review','answer_confidence':.95}
+        result,_=self.run_classification(answers,FakeAdapter('service_request'))
+        self.assertEqual(result['bucket'],'qualified')
+        self.assertTrue(result['safetyNeedsReview'])
+        self.assertEqual(result['safety'],'review')
+
+    def test_review_label_does_not_allow_advertisements(self):
+        answers=base_answers()
+        answers['safety']={'choice':'review','answer_confidence':.95}
+        result,_=self.run_classification(answers,FakeAdapter('self_promotion'))
+        self.assertNotEqual(result['bucket'],'qualified')
+
+    def test_unsafe_request_stays_blocked(self):
+        answers=base_answers()
+        answers['safety']={'choice':'B','answer_confidence':.95}
+        result,_=self.run_classification(answers,FakeAdapter('service_request'))
+        self.assertEqual(result['bucket'],'blocked')
+
+    def test_calibrated_type_threshold_is_advisory_for_requests(self):
         adapter=FakeAdapter("service_request",.7)
         adapter.manifest={"minimumPostTypeConfidence":.8}
         result,_=self.run_classification(base_answers(),adapter)
-        self.assertEqual(result["bucket"],"uncertain")
+        self.assertEqual(result["bucket"],"qualified")
+
+    def test_low_safety_confidence_does_not_veto_safe_request(self):
+        answers=base_answers()
+        answers['safety']={'choice':'A','answer_confidence':.5}
+        result,_=self.run_classification(answers,FakeAdapter('service_request',.55))
+        self.assertEqual(result['bucket'],'qualified')
+
+    def test_unsupported_service_still_cannot_qualify(self):
+        answers=base_answers()
+        answers['service']={'choice':'other','answer_confidence':.9}
+        result,_=self.run_classification(answers,FakeAdapter('service_request'))
+        self.assertNotEqual(result['bucket'],'qualified')
 
     def test_safe_supported_confident_request_can_qualify(self):
         result,_=self.run_classification(base_answers(),FakeAdapter("service_request"))

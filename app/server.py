@@ -35,11 +35,10 @@ DENIED_POST_ID = "1802484360951722"
 DENIED_GROUP_ID = "1163787441488087"
 MAX_BODY = 12 * 1024 * 1024
 MIN_AUTO_INTERVAL_SECONDS = 120
-DEFAULT_AUTO_HOURLY_LIMIT = 4
-MAX_AUTO_HOURLY_LIMIT = 20
+DEFAULT_AUTO_HOURLY_LIMIT = 40
+MAX_AUTO_HOURLY_LIMIT = 40
 DEFAULT_AUTO_DAILY_LIMIT = 20
 MAX_AUTO_DAILY_LIMIT = 200
-AUTO_GROUP_DAILY_LIMIT = 3
 AUTO_MAX_POST_AGE = timedelta(hours=24)
 SERVER_VERSION = "0.7.0"
 TEST_TRIGGERED = False
@@ -53,22 +52,18 @@ class AutoWait(ValueError):
         self.retry_seconds = retry_seconds
 
 
-def check_auto_limits(db: sqlite3.Connection, group_id: str | None = None) -> None:
+def check_auto_limits(db: sqlite3.Connection) -> None:
     now = datetime.now(timezone.utc)
     hourly_limit = get_auto_hourly_limit(db)
     daily_limit = get_auto_daily_limit(db)
     # Reservations count too: concurrent callers cannot consume the same quota twice.
-    for seconds, limit, group in [(3600, hourly_limit, None), (86400, daily_limit, None),
-                                  (86400, AUTO_GROUP_DAILY_LIMIT, group_id)]:
-        if limit == AUTO_GROUP_DAILY_LIMIT and group is None:
-            continue
+    for seconds, limit in [(3600, hourly_limit), (86400, daily_limit)]:
         count = db.execute(
-            "SELECT COUNT(*) FROM comment_queue WHERE (attempted_at>=? OR (status='processing' AND created_at>=?))" +
-            (" AND group_id=?" if group else ""),
-            ((now - timedelta(seconds=seconds)).isoformat(),) * 2 + ((group,) if group else ()),
+            "SELECT COUNT(*) FROM comment_queue WHERE (attempted_at>=? OR (status='processing' AND created_at>=?))",
+            ((now - timedelta(seconds=seconds)).isoformat(),) * 2,
         ).fetchone()[0]
         if count >= limit:
-            raise AutoWait(f"Đã đạt giới hạn vận hành {limit} comment/{'group/' if group else ''}{'giờ' if seconds == 3600 else '24 giờ'}")
+            raise AutoWait(f"Đã đạt giới hạn vận hành {limit} comment/{'giờ' if seconds == 3600 else '24 giờ'}")
 
 
 def utc_now() -> str:
@@ -493,13 +488,10 @@ def dashboard_data(bucket: str = "all") -> dict:
             item["laya_post_type"] = (laya_result.get("postType") or "unknown")
             item["laya_post_type_confidence"] = (laya_result.get("confidences") or {}).get("post_type")
             item["laya_post_type_minimum_confidence"] = laya_result.get("postTypeMinimumConfidence", .6)
-            item["laya_low_confidence_send_allowed"] = (
-                item.get("laya_status") == "done"
-                and item.get("laya_bucket") != "blocked"
-                and laya_classifier.allows_uncertain_post_type(laya_result)
-            )
-            if item["laya_low_confidence_send_allowed"]:
-                item["laya_bucket"] = "qualified"
+            item['laya_service_confidence']=(laya_result.get('confidences') or {}).get('service')
+            item['laya_safety_confidence']=(laya_result.get('confidences') or {}).get('safety')
+            item['laya_decision_reasons']=laya_result.get('decisionReasons') or []
+            item['laya_safety_review']=laya_result.get('safetyNeedsReview',False)
             posts.append(item)
         counts = {row["bucket"]: row["n"] for row in db.execute(
             """SELECT bucket,COUNT(*) n FROM posts
@@ -578,13 +570,7 @@ def auto_eligibility(post: sqlite3.Row | dict, config: dict | None = None) -> tu
     if item.get("laya_status") != "done":
         return False, "laya_" + str(item.get("laya_status") or "pending")
     if item.get("laya_bucket") != "qualified":
-        try:
-            laya_result = json.loads(item.get("laya_result") or "{}")
-        except (TypeError, json.JSONDecodeError):
-            laya_result = {}
-        if (item.get("laya_bucket") == "blocked"
-                or not laya_classifier.allows_uncertain_post_type(laya_result)):
-            return False, "laya_not_qualified"
+        return False, "laya_not_qualified"
     if not (item.get("text") or "").strip():
         return False, "empty_post"
     published_at = item.get("published_at")
@@ -632,7 +618,7 @@ def reserve_auto_comment() -> dict | None:
             if not auto_eligibility(row, filter_rules)[0]:
                 continue
             try:
-                check_auto_limits(db, row["group_id"])
+                check_auto_limits(db)
             except AutoWait as exc:
                 group_wait = exc
                 continue
@@ -647,7 +633,7 @@ def reserve_auto_comment() -> dict | None:
     text = generated["comment"]
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
-        check_auto_limits(db, post["group_id"])
+        check_auto_limits(db)
         still_available = db.execute(
             """SELECT p.* FROM posts p
                LEFT JOIN groups g ON g.id=p.group_id
@@ -913,6 +899,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(404, {"error": "Không tìm thấy"})
         except (ValueError, json.JSONDecodeError, sqlite3.Error) as exc:
             self.send_json(400, {"error": str(exc)})
+        except RuntimeError as exc:
+            self.send_json(502, {"error": str(exc)})
 
 
 if __name__ == "__main__":

@@ -45,13 +45,17 @@ async function createTaskTab() {
 }
 
 const defaultState = () => ({
-  enabled: false, continuousOptIn: false, batchSize: 3, remaining: 0, delayMinutes: 10, tabId: null,
+  enabled: false, continuousOptIn: false, delayMinutes: 10, tabId: null,
   status: 'idle', currentPostId: null, sent: 0, lastResult: null, updatedAt: new Date().toISOString(),
 });
 
 async function state() {
   const stored = (await chrome.storage.local.get(STATE_KEY))[STATE_KEY];
-  return {...defaultState(), ...(stored || {})};
+  const next = {...defaultState(), ...(stored || {})};
+  delete next.batchSize;
+  delete next.remaining;
+  if (next.status === 'waiting_next_batch') next.status = 'waiting';
+  return next;
 }
 
 async function updateState(patch) {
@@ -318,7 +322,6 @@ async function processOne() {
       return;
     }
     await chrome.alarms.create(ALARM, {delayInMinutes: 6});
-    if (current.remaining < 1) current = await updateState({remaining: current.batchSize});
     await updateState({status: 'selecting_and_writing', currentPostId: null, lastResult: null});
     const reserved = await local('/api/comments/auto-next', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
@@ -629,16 +632,15 @@ rectCount=${comparison.NORMAL.rectCount}`);
       if (report.status === 'PAUSED_FACEBOOK') await stopBackgroundScan();
       return;
     }
-    const remaining = Math.max(0, current.remaining - 1);
     if (current.runOnce) {
       await chrome.alarms.clear(ALARM);
-      await updateState({enabled: false, remaining: 0, sent: current.sent + 1,
+      await updateState({enabled: false, sent: current.sent + 1,
         status: 'test_complete', currentPostId: null, lastResult: report});
       return;
     }
     const next = await updateState({
-      remaining: remaining || current.batchSize, sent: current.sent + 1,
-      status: current.enabled ? (remaining > 0 ? 'waiting' : 'waiting_next_batch') : 'stopped_by_user',
+      sent: current.sent + 1,
+      status: current.enabled ? 'waiting' : 'stopped_by_user',
       currentPostId: null, lastResult: report,
     });
     if (next.enabled) await chrome.alarms.create(ALARM, {delayInMinutes: next.delayMinutes});
@@ -662,11 +664,10 @@ rectCount=${comparison.NORMAL.rectCount}`);
 
 async function startAutomation(message) {
   await checkBackendVersion();
-  const limit = Math.max(1, Math.min(Number(message.limit) || 1, 10));
   const delayMinutes = Math.max(2, Math.min(Number(message.delayMinutes) || 10, 60));
   await chrome.alarms.clear(ALARM);
   const next = await updateState({
-    enabled: true, continuousOptIn: true, batchSize: limit, remaining: limit, delayMinutes, status: 'starting',
+    enabled: true, continuousOptIn: true, delayMinutes, status: 'starting',
     currentPostId: null, sent: 0, lastResult: null, inFlightQueueId: null, driverVersion: '0.6.7',
     runOnce: Boolean(message.runOnce),
   });
@@ -676,7 +677,7 @@ async function startAutomation(message) {
 
 async function stopAutomation() {
   await chrome.alarms.clear(ALARM);
-  const current = await updateState({enabled: false, status: 'stopped_by_user', remaining: 0});
+  const current = await updateState({enabled: false, status: 'stopped_by_user'});
   if (current.tabId) {
     try {
       await chrome.scripting.executeScript({target: {tabId: current.tabId}, world: 'MAIN',
@@ -708,7 +709,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   const stored = (await chrome.storage.local.get(STATE_KEY))[STATE_KEY];
   if (!stored) await chrome.storage.local.set({[STATE_KEY]: defaultState()});
   else if (stored.enabled && (!stored.continuousOptIn || stored.driverVersion !== '0.6.7')) {
-    await updateState({enabled: false, status: 'needs_restart', remaining: 0});
+    await updateState({enabled: false, status: 'needs_restart'});
     await chrome.alarms.clear(ALARM);
   } else if (stored.enabled) await chrome.alarms.create(ALARM, {delayInMinutes: 0.5});
   const scanStored = (await chrome.storage.local.get(SCAN_STATE_KEY))[SCAN_STATE_KEY];

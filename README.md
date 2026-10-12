@@ -92,19 +92,19 @@ Sau khi đã lưu danh sách group, quét ngầm tự mở tab tác vụ và t�
 - Khi kết thúc, bấm **Dừng gửi ngầm**, **Dừng quét ngầm**, rồi **Dừng tool**
   trên dashboard.
 
-Mặc định nghỉ 10 phút giữa các vòng quét và giữa comment; số comment/lượt là 3,
-giới hạn 4 comment/giờ và 20 comment/ngày. Có thể chỉnh trong popup.
-Mỗi group còn có giới hạn 3 comment/24 giờ ở backend.
+Mặc định nghỉ 10 phút giữa các vòng quét và giữa comment;
+giới hạn 40 comment/giờ và 20 comment/ngày. Có thể chỉnh trong popup.
+Không giới hạn số comment mỗi lượt hay mỗi group.
 
 Một bài chỉ được tự gửi khi thuộc group cho phép gửi, đọc được ngày đăng trên
-Facebook và không quá 24 giờ, qua rule, được Laya đánh dấu phù hợp với độ tin cậy
-ít nhất 60% cho nhóm dịch vụ/an toàn, và chưa có lịch sử xếp hàng/gửi.
-Khi dùng đầu phân loại đã train cục bộ, loại bài phải là nhu cầu tìm nhà cung cấp
-và qua ngưỡng riêng trong manifest model (bản ngày 11/10/2026 dùng 90%).
-Theo cấu hình chủ tool ngày 12/10/2026, nếu tin cậy loại bài dưới 70% thì vẫn
-được xét gửi, kể cả nhãn nghiêng về bài khác, tuyển dụng hoặc tự quảng cáo.
-Ngoại lệ này chỉ bỏ chặn theo loại bài/ý định; dịch vụ và an toàn vẫn phải đạt
-60%, đồng thời qua rule, tuổi bài, nhóm được phép gửi, chống trùng và giới hạn gửi.
+Facebook và không quá 24 giờ, qua rule, được Laya nhận là nhu cầu thuê dịch vụ
+website/phần mềm/tự động hóa, có nhãn an toàn A hoặc review,
+và chưa có lịch sử xếp hàng/gửi. Điểm tin cậy chỉ để tham khảo, không chặn gửi.
+Quy tắc ngoại lệ dưới 70% đã được xóa. Chỉ xét gửi nhu cầu thuê dịch vụ;
+bài quảng cáo, tuyển dụng và bài khác không được tự gửi theo điểm thấp.
+Nhãn an toàn `review` (cần xem lại mục đích) được xét gửi theo cấu hình chủ tool;
+vẫn phải đạt điều kiện nhu cầu, dịch vụ và các kiểm tra gửi còn lại.
+Nhãn `B` và từ khóa chặn không được gửi.
 Độ tin cậy của model không phải tỷ lệ chính xác đã được kiểm chứng trên dữ liệu này.
 Nếu đã nhấn gửi mà kết quả chưa xác minh được, tool lưu lần thử và không gửi lại
 cùng nội dung. Không dùng lại bài bị khóa để ép chạy thử.
@@ -115,21 +115,23 @@ cùng nội dung. Không dùng lại bài bị khóa để ép chạy thử.
 `data/laya/posts_labeled.jsonl`; bản đọc nhanh ở `data/laya/LABELS.md`.
 `data/laya/TRAINING_REPORT.md` ghi phương pháp, kết quả và giới hạn trên mẫu nhỏ.
 Đầu phân loại bốn nhãn học từ encoder Laya đóng băng và TF-IDF của tập học;
-trọng số đã train được đóng gói trong `models/laya-post-type/`, nhóm dịch vụ/an
-toàn dùng model gốc.
+trọng số đã train được đóng gói trong `models/laya-post-type/`.
+Bản mới gồm đầu phân loại loại bài, dịch vụ và an toàn, cùng bộ hiệu chỉnh điểm.
 
 Máy mới tự dùng `models/laya-post-type/active.json` và release đi kèm khi
 clone, `git pull` hoặc tải ZIP: **không cần train lại**. Chạy `setup-tool.cmd`
 để cài thư viện và tải model nền Laya/Qwen, rồi mở `start-tool.cmd`.
-Nếu có `.local/laya-training/active.json`, tool ưu tiên model đã được kích hoạt
-riêng trên máy đó. Muốn mang model riêng sang máy khác, chép file active và
+Nếu có `.local/laya-training/active.json`, tool dùng model local nếu phiên bản
+không cũ hơn model đi kèm Git. Muốn mang model riêng sang máy khác, chép file active và
 thư mục release được trỏ tới, giữ nguyên cấu trúc trong `.local/laya-training/`.
 Sau khi backend nạp model, dashboard hiện **đã train loại bài**.
 
 ## Chuyển từ máy cá nhân sang máy công ty
 
 Nếu đã clone repo, chạy `git pull`, rồi `setup-tool.cmd` và `start-tool.cmd`.
-Model phân loại đã train và rule gửi dưới 70% đi cùng mã nguồn. Rule từ khóa,
+Máy đã cài thư viện/model nền chỉ cần dừng tool, `git pull`, chạy `start-tool.cmd`,
+rồi tải lại extension DK-Tech trong `chrome://extensions` để áp dụng giao diện và worker mới.
+Model phân loại đã train đi cùng mã nguồn. Rule từ khóa,
 nhóm đã chọn và lịch sử gửi được lưu trong database riêng của từng máy.
 
 Dừng quét và gửi trên máy cũ trước khi bật trên máy mới nếu chỉ muốn một máy gửi.

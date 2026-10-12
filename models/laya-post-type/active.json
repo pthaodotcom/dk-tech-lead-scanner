@@ -1,5 +1,5 @@
 {
-  "directory": "releases/5bc1339a097dd1d1",
-  "weightsSha256": "5bc1339a097dd1d1102304a09515101d6b427bbc5c5be25ed5eea2932a1cf407",
-  "runVersion": "2026-10-11-trained-encoder-lexical-head-v1"
+  "directory": "releases/a386cd1f84a28b2f",
+  "weightsSha256": "617220c3ad9f9edb42a9e4295c39795abc3999107ee8ec6e10f235521fd56f62",
+  "runVersion": "2026-10-12-type-service-safety-v3-crawlers"
 }

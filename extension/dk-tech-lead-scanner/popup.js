@@ -126,7 +126,7 @@ function renderAuto(state) {
     idle: 'Chưa chạy', starting: 'Đang khởi động', selecting_and_writing: 'Đang chọn bài và Qwen viết comment',
     waiting_posts: 'Đang chờ bài phù hợp rule',
     opening_post: 'Đang mở bài trong tab nền', sending: 'Đang gửi comment', waiting: 'Đang nghỉ trước comment tiếp theo',
-    waiting_next_batch: 'Đang nghỉ trước lượt tiếp theo', stopped: 'Đã tự dừng do lỗi/kết quả chưa rõ',
+    stopped: 'Đã tự dừng do lỗi/kết quả chưa rõ',
     stopped_by_user: 'Đã dừng theo yêu cầu', needs_restart: 'Cần bật gửi ngầm riêng ở bản mới',
   };
   const detail = state.currentPostId ? ` · bài ${state.currentPostId}` : '';
@@ -134,7 +134,7 @@ function renderAuto(state) {
     state.lastResult?.error || state.lastResult?.status || '';
   const missing = state.lastResult?.missingRelayProviders?.slice(0, 3).join(', ') || '';
   document.getElementById('autoStatus').textContent =
-    `${labels[state.status] || state.status}${detail} · còn ${state.remaining} trong lượt · đã gửi ${state.sent}` +
+    `${labels[state.status] || state.status}${detail} · đã gửi ${state.sent}` +
     (result ? ` · ${result}` : '') + (missing ? ` · ${missing}` : '');
   document.getElementById('autoStart').disabled = Boolean(state.enabled && state.continuousOptIn);
   document.getElementById('autoTest').disabled = Boolean(state.enabled);
@@ -161,6 +161,7 @@ async function saveAutoSettings() {
 
 async function loadAutoSettings() {
   const value = await local('/api/automation-settings');
+  document.getElementById('autoHourlyLimit').max = value.maximumHourlyLimit;
   document.getElementById('autoHourlyLimit').value = value.hourlyLimit;
   document.getElementById('autoDailyLimit').value = value.dailyLimit;
 }
@@ -169,7 +170,6 @@ async function startAuto(runOnce = false) {
   await saveAutoSettings();
   const state = await autoMessage({
     type: 'auto-start', runOnce,
-    limit: Number(document.getElementById('autoLimit').value),
     delayMinutes: Number(document.getElementById('autoDelay').value),
   });
   renderAuto(state);

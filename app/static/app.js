@@ -16,11 +16,11 @@ function layaStatusText(post) {
   if (post.laya_status !== 'done') return ({pending:'Đang chờ Laya',processing:'Laya đang phân loại',failed:'Laya lỗi'})[post.laya_status] || 'Chưa phân loại';
   const type = layaTypeLabel(post.laya_post_type);
   if (post.laya_bucket === 'blocked') return type ? `Chặn an toàn · ${type}` : 'Bị chặn do nội dung không an toàn';
-  if (post.laya_low_confidence_send_allowed) return `Nghiêng về: ${type || 'Chưa rõ loại bài'} · vẫn xét gửi (dưới 70%)`;
+  if (post.laya_safety_review) return `${post.laya_bucket === 'qualified' ? 'Đủ điều kiện · ' : ''}${type || 'Chưa rõ loại bài'} · cần xem lại mục đích`;
   if (type) {
+    if (post.laya_bucket === 'qualified') return `Đủ điều kiện · ${type}`;
     const minimum = post.laya_post_type === 'service_request' ? Number(post.laya_post_type_minimum_confidence ?? .6) : .6;
     if (post.laya_post_type_confidence != null && Number(post.laya_post_type_confidence) < minimum) return `Nghiêng về: ${type} · cần xem lại`;
-    if (post.laya_bucket === 'qualified') return `Đủ điều kiện · ${type}`;
     if (post.laya_post_type === 'recruitment' || post.laya_post_type === 'self_promotion' || post.laya_post_type === 'other') return `${type} · không phải lead`;
     return `${type} · chưa đủ chắc để tự động comment`;
   }
@@ -182,15 +182,18 @@ function render(data) {
         <h3>${escapeHtml(post.group_name || `Group ${post.group_id}`)}</h3>
         <p class="post-text">${escapeHtml(post.text || '(Bài không có nội dung chữ)')}</p>
         <div class="meta">
-          <span class="pill ${post.bucket}">${post.bucket === 'candidate' ? 'Tiềm năng' : post.bucket === 'blocked' ? 'Đã chặn' : 'Chưa chắc'}</span>
-          <span class="pill">Điểm ${post.score}</span>
+          <span class="pill ${post.bucket}">${post.bucket === 'candidate' ? 'Khớp từ khóa' : post.bucket === 'blocked' ? 'Đã chặn' : 'Chưa khớp từ khóa'}</span>
+          <span class="pill">Điểm từ khóa ${post.score}</span>
           <span class="pill ${post.laya_bucket === 'qualified' ? 'candidate' : post.laya_bucket === 'blocked' ? 'blocked' : 'uncertain'}">Laya: ${escapeHtml(layaStatusText(post))}</span>
           ${post.laya_status === 'done' && post.laya_post_type_confidence != null ? `<span class="pill">Tin cậy loại bài ${(Number(post.laya_post_type_confidence) * 100).toFixed(0)}%</span>` : ''}
+          ${post.laya_status === 'done' && post.laya_service_confidence != null ? `<span class="pill">Tin cậy dịch vụ ${(Number(post.laya_service_confidence) * 100).toFixed(0)}%</span>` : ''}
+          ${post.laya_status === 'done' && post.laya_safety_confidence != null ? `<span class="pill">Tin cậy an toàn ${(Number(post.laya_safety_confidence) * 100).toFixed(0)}%</span>` : ''}
           <span class="pill">ID ${post.id}</span>
           ${post.published_at ? `<span class="pill">Đăng lúc: ${new Date(post.published_at).toLocaleString('vi-VN')}</span>` : ''}
           ${post.queue_status ? `<span class="pill">Comment: ${escapeHtml(post.queue_status)}</span>` : ''}
         </div>
         <p class="reason">${post.reasons.map(escapeHtml).join(' · ')}</p>
+        ${post.laya_decision_reasons?.length ? `<p class="reason">Laya: ${post.laya_decision_reasons.map(escapeHtml).join(' · ')}</p>` : ''}
       </div>
       <div class="actions">
         <a href="${escapeHtml(post.url)}" target="_blank" rel="noreferrer">Mở bài</a>
